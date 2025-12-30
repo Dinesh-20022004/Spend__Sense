@@ -31,17 +31,16 @@ class ReportsFragment : Fragment() {
     private var _binding: FragmentReportsBinding? = null
     private val binding get() = _binding!!
 
-    // Get the shared ViewModel instance using the factory.
-    // NEW AND CORRECT
     private val transactionViewModel: TransactionViewModel by viewModels {
         TransactionViewModelFactory(requireActivity().application)
     }
-    private var currentFilter = "week" // "week", "month", or "all"
+
+    // NEW: Store the full list locally to ensure filters always have data to work with
+    private var fullTransactionList: List<Transaction> = emptyList()
+    private var currentFilter = "week" // Default filter
 
     override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?
+        inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
         _binding = FragmentReportsBinding.inflate(inflater, container, false)
         return binding.root
@@ -51,74 +50,91 @@ class ReportsFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         setupFilterButtons()
-        observeViewModel() // The new entry point for data.
+        observeViewModel()
     }
 
     private fun observeViewModel() {
-        // This block will execute automatically whenever the transaction list in the database changes.
-        transactionViewModel.allTransactions.observe(viewLifecycleOwner, Observer { allTransactions ->
-            allTransactions?.let {
-                // When new data arrives, re-apply the current date filter.
-                applyFilter(currentFilter, it)
+        transactionViewModel.allTransactions.observe(viewLifecycleOwner, Observer { transactions ->
+            transactions?.let {
+                // Update our local copy of the full list
+                fullTransactionList = it
+                // Re-apply the current filter with the new data
+                applyFilter(currentFilter)
             }
         })
     }
 
     private fun setupFilterButtons() {
-        updateFilterButtonStyles(currentFilter)
-        val allTransactions = transactionViewModel.allTransactions.value ?: emptyList()
-        binding.btnThisWeek.setOnClickListener { applyFilter("week", allTransactions) }
-        binding.btnThisMonth.setOnClickListener { applyFilter("month", allTransactions) }
-        binding.btnAllTime.setOnClickListener { applyFilter("all", allTransactions) }
+        // Just call applyFilter with the string. It will use the local fullTransactionList.
+        binding.btnThisWeek.setOnClickListener { applyFilter("week") }
+        binding.btnThisMonth.setOnClickListener { applyFilter("month") }
+        binding.btnAllTime.setOnClickListener { applyFilter("all") }
     }
 
-    private fun applyFilter(filter: String, allTransactions: List<Transaction>) {
+    private fun applyFilter(filter: String) {
         currentFilter = filter
         updateFilterButtonStyles(filter)
 
         val calendar = Calendar.getInstance()
+        // Reset time to midnight so we compare dates only, not times
+        calendar.set(Calendar.HOUR_OF_DAY, 0)
+        calendar.set(Calendar.MINUTE, 0)
+        calendar.set(Calendar.SECOND, 0)
+        calendar.set(Calendar.MILLISECOND, 0)
 
         val filteredTransactions = when (filter) {
             "week" -> {
                 calendar.add(Calendar.DAY_OF_YEAR, -7)
-                allTransactions.filter { parseDate(it.date)?.after(calendar.time) ?: false }
+                val weekAgo = calendar.time
+                fullTransactionList.filter {
+                    val transDate = parseDate(it.date)
+                    // Include if date is NOT before the cutoff (so it includes the cutoff day)
+                    transDate != null && !transDate.before(weekAgo)
+                }
             }
             "month" -> {
                 calendar.add(Calendar.MONTH, -1)
-                allTransactions.filter { parseDate(it.date)?.after(calendar.time) ?: false }
+                val monthAgo = calendar.time
+                fullTransactionList.filter {
+                    val transDate = parseDate(it.date)
+                    transDate != null && !transDate.before(monthAgo)
+                }
             }
-            else -> allTransactions
+            else -> fullTransactionList // "all" returns everything
         }
+
         updateAllCharts(filteredTransactions)
     }
 
     private fun updateFilterButtonStyles(selectedFilter: String) {
-        val buttons = listOf(binding.btnThisWeek, binding.btnThisMonth, binding.btnAllTime)
         val primaryColor = ContextCompat.getColor(requireContext(), R.color.primary)
+        val whiteColor = ContextCompat.getColor(requireContext(), R.color.white)
+        val transparentColor = ContextCompat.getColor(requireContext(), android.R.color.transparent)
 
-        buttons.forEach { button ->
-            button.setBackgroundColor(ContextCompat.getColor(requireContext(), android.R.color.transparent))
-            button.setTextColor(primaryColor)
-        }
+        binding.btnThisWeek.apply { setBackgroundColor(transparentColor); setTextColor(primaryColor) }
+        binding.btnThisMonth.apply { setBackgroundColor(transparentColor); setTextColor(primaryColor) }
+        binding.btnAllTime.apply { setBackgroundColor(transparentColor); setTextColor(primaryColor) }
 
-        val selectedButton = when (selectedFilter) {
-            "week" -> binding.btnThisWeek
-            "month" -> binding.btnThisMonth
-            else -> binding.btnAllTime
+        when (selectedFilter) {
+            "week" -> binding.btnThisWeek.apply { setBackgroundColor(primaryColor); setTextColor(whiteColor) }
+            "month" -> binding.btnThisMonth.apply { setBackgroundColor(primaryColor); setTextColor(whiteColor) }
+            "all" -> binding.btnAllTime.apply { setBackgroundColor(primaryColor); setTextColor(whiteColor) }
         }
-        selectedButton.setBackgroundColor(primaryColor)
-        selectedButton.setTextColor(Color.WHITE)
     }
 
     private fun updateAllCharts(filteredTransactions: List<Transaction>) {
+        // If the list is empty, we still want to update UI to show empty states
         updateSummaryCards(filteredTransactions)
         setupPieChart(filteredTransactions)
         setupBarChart(filteredTransactions)
         setupTopCategories(filteredTransactions)
+        setupLineChart(filteredTransactions)
     }
 
     private fun updateSummaryCards(filteredTransactions: List<Transaction>) {
-        val totalSpending = filteredTransactions.filter { it.type == "expense" }.sumOf { it.amount }
+        val expenses = filteredTransactions.filter { it.type == "expense" }
+        val totalSpending = expenses.sumOf { it.amount }
+
         binding.tvTotalSpending.text = "₹${String.format("%.0f", totalSpending)}"
         binding.tvTransactionCount.text = "${filteredTransactions.size}"
     }
@@ -143,21 +159,20 @@ class ReportsFragment : Fragment() {
             valueTextColor = Color.WHITE
         }
 
-        binding.pieChart.apply {
-            data = PieData(dataSet)
-            description.isEnabled = false
-            legend.isEnabled = false
-            isDrawHoleEnabled = true
-            holeRadius = 45f
-            setEntryLabelColor(Color.BLACK)
-            animateY(1000, Easing.EaseInOutQuad)
-            invalidate()
-        }
+        binding.pieChart.data = PieData(dataSet)
+        binding.pieChart.description.isEnabled = false
+        binding.pieChart.legend.isEnabled = false
+        binding.pieChart.isDrawHoleEnabled = true
+        binding.pieChart.holeRadius = 45f
+        binding.pieChart.setEntryLabelColor(Color.BLACK)
+        binding.pieChart.animateY(1000, Easing.EaseInOutQuad)
+        binding.pieChart.invalidate()
     }
 
     private fun setupBarChart(filteredTransactions: List<Transaction>) {
         val income = filteredTransactions.filter { it.type == "income" }.sumOf { it.amount }
         val expense = filteredTransactions.filter { it.type == "expense" }.sumOf { it.amount }
+
         val entries = listOf(BarEntry(0f, income.toFloat()), BarEntry(1f, expense.toFloat()))
 
         val dataSet = BarDataSet(entries, "").apply {
@@ -168,28 +183,74 @@ class ReportsFragment : Fragment() {
             valueTextSize = 12f
         }
 
-        binding.barChart.apply {
-            data = BarData(dataSet)
-            description.isEnabled = false
-            legend.isEnabled = false
-            xAxis.valueFormatter = IndexAxisValueFormatter(listOf("Income", "Expense"))
-            xAxis.position = XAxis.XAxisPosition.BOTTOM
-            xAxis.setDrawGridLines(false)
-            axisLeft.axisMinimum = 0f
-            axisRight.isEnabled = false
-            animateY(1000)
-            invalidate()
+        binding.barChart.data = BarData(dataSet)
+        binding.barChart.description.isEnabled = false
+        binding.barChart.legend.isEnabled = false
+        binding.barChart.xAxis.apply {
+            valueFormatter = IndexAxisValueFormatter(listOf("Income", "Expense"))
+            position = XAxis.XAxisPosition.BOTTOM
+            setDrawGridLines(false)
+            granularity = 1f
         }
+        binding.barChart.axisLeft.axisMinimum = 0f
+        binding.barChart.axisRight.isEnabled = false
+        binding.barChart.animateY(1000)
+        binding.barChart.invalidate()
+    }
+
+    private fun setupLineChart(filteredTransactions: List<Transaction>) {
+        val expenses = filteredTransactions.filter { it.type == "expense" }
+
+        // Group expenses by date
+        val dailyExpenses = expenses.groupBy { it.date }
+            .mapValues { entry -> entry.value.sumOf { it.amount } }
+            .toSortedMap()
+
+        val entries = ArrayList<Entry>()
+        var index = 0f
+        dailyExpenses.forEach { (_, amount) ->
+            entries.add(Entry(index, amount.toFloat()))
+            index++
+        }
+
+        if (entries.isEmpty()) {
+            binding.lineChart.clear() // Clear if no data
+            return
+        }
+
+        val dataSet = LineDataSet(entries, "Daily Spending").apply {
+            color = ContextCompat.getColor(requireContext(), R.color.expense_red)
+            valueTextColor = Color.BLACK
+            lineWidth = 2f
+            setCircleColor(ContextCompat.getColor(requireContext(), R.color.expense_red))
+            setDrawValues(false)
+        }
+
+        binding.lineChart.data = LineData(dataSet)
+        binding.lineChart.description.isEnabled = false
+        binding.lineChart.legend.isEnabled = false
+        binding.lineChart.xAxis.apply {
+            position = XAxis.XAxisPosition.BOTTOM
+            setDrawGridLines(false)
+            setDrawLabels(false) // Hide date labels for simplicity
+        }
+        binding.lineChart.axisRight.isEnabled = false
+        binding.lineChart.animateX(1000)
+        binding.lineChart.invalidate()
     }
 
     private fun setupTopCategories(filteredTransactions: List<Transaction>) {
         val expenses = filteredTransactions.filter { it.type == "expense" }
+
+        // Always set visibility. If empty, hide it.
         if (expenses.isEmpty()) {
             binding.rvTopCategories.visibility = View.GONE
             return
         }
         binding.rvTopCategories.visibility = View.VISIBLE
+
         val totalExpense = expenses.sumOf { it.amount }
+        // Prevent division by zero
         if (totalExpense == 0.0) {
             binding.rvTopCategories.visibility = View.GONE
             return
@@ -208,9 +269,12 @@ class ReportsFragment : Fragment() {
         Color.parseColor("#FFA726"), Color.parseColor("#AB47BC"), Color.parseColor("#26A69A")
     )
 
-    private fun parseDate(dateString: String): Date? = try {
-        SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).parse(dateString)
-    } catch (e: Exception) { null }
+    private fun parseDate(dateString: String): Date? {
+        // Ensure this matches the format you save in AddTransactionActivity (yyyy-MM-dd)
+        return try {
+            SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).parse(dateString)
+        } catch (e: Exception) { null }
+    }
 
     override fun onDestroyView() {
         super.onDestroyView()

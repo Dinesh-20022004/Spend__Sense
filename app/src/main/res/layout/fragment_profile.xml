@@ -13,7 +13,7 @@
         android:orientation="vertical"
         android:padding="20dp">
 
-        <!-- HEADER CARD -->
+        <!-- ==================== USER INFO CARD ==================== -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -57,7 +57,7 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- ACCOUNT SECTION -->
+        <!-- ==================== ACCOUNT SECTION ==================== -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -79,71 +79,88 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
 
-                <!-- EDIT PROFILE ROW -->
-                <LinearLayout
+                <!-- Edit Profile Button -->
+                <androidx.constraintlayout.widget.ConstraintLayout
                     android:id="@+id/btnEditProfile"
                     android:layout_width="match_parent"
-                    android:layout_height="56dp"
-                    android:background="?attr/selectableItemBackground"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingStart="16dp"
-                    android:paddingEnd="16dp">
+                    android:layout_height="wrap_content"
+                    android:minHeight="56dp"
+                    android:background="@drawable/clickable_item_background"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:padding="16dp">
 
                     <TextView
+                        android:id="@+id/icon_edit"
                         android:layout_width="32dp"
                         android:layout_height="32dp"
                         android:gravity="center"
                         android:text="✏️"
-                        android:textSize="20sp" />
+                        android:textSize="20sp"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toTopOf="parent" />
 
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="16dp"
-                        android:layout_weight="1"
                         android:text="Edit Profile"
                         android:textColor="@color/black"
-                        android:textSize="16sp" />
+                        android:textSize="16sp"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintEnd_toStartOf="@id/arrow_edit"
+                        app:layout_constraintStart_toEndOf="@id/icon_edit"
+                        app:layout_constraintTop_toTopOf="parent" />
 
                     <ImageView
+                        android:id="@+id/arrow_edit"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:src="@drawable/ic_arrow_forward"
-                        app:tint="@color/gray" />
-                </LinearLayout>
+                        app:tint="@color/gray"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintTop_toTopOf="parent" />
+                </androidx.constraintlayout.widget.ConstraintLayout>
 
-                <!-- DIVIDER -->
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:background="@color/light_gray"
-                    android:layout_marginStart="64dp" />
+                    android:layout_marginStart="64dp"
+                    android:background="@color/light_gray" />
 
-                <!-- CURRENCY ROW -->
-                <LinearLayout
+                <!-- Currency Button -->
+                <androidx.constraintlayout.widget.ConstraintLayout
                     android:id="@+id/btnCurrency"
                     android:layout_width="match_parent"
-                    android:layout_height="56dp"
-                    android:background="?attr/selectableItemBackground"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingStart="16dp"
-                    android:paddingEnd="16dp">
+                    android:layout_height="wrap_content"
+                    android:minHeight="56dp"
+                    android:background="@drawable/clickable_item_background"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:padding="16dp">
 
                     <TextView
+                        android:id="@+id/icon_currency"
                         android:layout_width="32dp"
                         android:layout_height="32dp"
                         android:gravity="center"
                         android:text="💱"
-                        android:textSize="20sp" />
+                        android:textSize="20sp"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toTopOf="parent" />
 
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="16dp"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
+                        android:orientation="vertical"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintEnd_toStartOf="@id/arrow_currency"
+                        app:layout_constraintStart_toEndOf="@id/icon_currency"
+                        app:layout_constraintTop_toTopOf="parent">
 
                         <TextView
                             android:layout_width="wrap_content"
@@ -162,16 +179,20 @@
                     </LinearLayout>
 
                     <ImageView
+                        android:id="@+id/arrow_currency"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:src="@drawable/ic_arrow_forward"
-                        app:tint="@color/gray" />
-                </LinearLayout>
+                        app:tint="@color/gray"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintTop_toTopOf="parent" />
+                </androidx.constraintlayout.widget.ConstraintLayout>
 
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- DATA SECTION -->
+        <!-- ==================== DATA SECTION ==================== -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -193,80 +214,151 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
 
-                <!-- EXPORT DATA ROW -->
-                <LinearLayout
+                <!-- Export Data Button -->
+                <androidx.constraintlayout.widget.ConstraintLayout
                     android:id="@+id/btnExportData"
                     android:layout_width="match_parent"
-                    android:layout_height="56dp"
-                    android:background="?attr/selectableItemBackground"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingStart="16dp"
-                    android:paddingEnd="16dp">
+                    android:layout_height="wrap_content"
+                    android:minHeight="56dp"
+                    android:background="@drawable/clickable_item_background"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:padding="16dp">
 
                     <TextView
+                        android:id="@+id/icon_export"
                         android:layout_width="32dp"
                         android:layout_height="32dp"
                         android:gravity="center"
                         android:text="📤"
-                        android:textSize="20sp" />
+                        android:textSize="20sp"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toTopOf="parent" />
 
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="16dp"
-                        android:layout_weight="1"
                         android:text="Export Data"
                         android:textColor="@color/black"
-                        android:textSize="16sp" />
+                        android:textSize="16sp"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintEnd_toStartOf="@id/arrow_export"
+                        app:layout_constraintStart_toEndOf="@id/icon_export"
+                        app:layout_constraintTop_toTopOf="parent" />
 
                     <ImageView
+                        android:id="@+id/arrow_export"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:src="@drawable/ic_arrow_forward"
-                        app:tint="@color/gray" />
-                </LinearLayout>
+                        app:tint="@color/gray"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintTop_toTopOf="parent" />
+                </androidx.constraintlayout.widget.ConstraintLayout>
 
-                <!-- DIVIDER -->
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:background="@color/light_gray"
-                    android:layout_marginStart="64dp" />
+                    android:layout_marginStart="64dp"
+                    android:background="@color/light_gray" />
 
-                <!-- CLEAR DATA ROW -->
-                <LinearLayout
+                <!-- Clear Data Button -->
+                <androidx.constraintlayout.widget.ConstraintLayout
                     android:id="@+id/btnClearData"
                     android:layout_width="match_parent"
-                    android:layout_height="56dp"
-                    android:background="?attr/selectableItemBackground"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingStart="16dp"
-                    android:paddingEnd="16dp">
+                    android:layout_height="wrap_content"
+                    android:minHeight="56dp"
+                    android:background="@drawable/clickable_item_background"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:padding="16dp">
 
                     <TextView
+                        android:id="@+id/icon_clear"
                         android:layout_width="32dp"
                         android:layout_height="32dp"
                         android:gravity="center"
                         android:text="🗑️"
-                        android:textSize="20sp" />
+                        android:textSize="20sp"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toTopOf="parent" />
 
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="16dp"
-                        android:layout_weight="1"
                         android:text="Clear All Data"
                         android:textColor="@color/expense_red"
-                        android:textSize="16sp" />
+                        android:textSize="16sp"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintEnd_toStartOf="@id/arrow_clear"
+                        app:layout_constraintStart_toEndOf="@id/icon_clear"
+                        app:layout_constraintTop_toTopOf="parent" />
 
                     <ImageView
+                        android:id="@+id/arrow_clear"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:src="@drawable/ic_arrow_forward"
-                        app:tint="@color/gray" />
-                </LinearLayout>
+                        app:tint="@color/gray"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintTop_toTopOf="parent" />
+                </androidx.constraintlayout.widget.ConstraintLayout>
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- ==================== ABOUT SECTION ==================== -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:text="About"
+            android:textColor="@color/gray"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="24dp"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="2dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Spend Sense"
+                    android:textColor="@color/black"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="Version 1.0.0"
+                    android:textColor="@color/gray"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Track your expenses and manage your budget efficiently."
+                    android:textColor="@color/gray"
+                    android:textSize="12sp" />
 
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>

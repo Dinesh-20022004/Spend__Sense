@@ -46,6 +46,7 @@ class ProfileFragment : Fragment() {
     private val budgetViewModel: BudgetViewModel by viewModels {
         BudgetViewModelFactory(requireActivity().application)
     }
+    // AuthViewModel not strictly needed here but fine to keep
     private val authViewModel: AuthViewModel by viewModels {
         AuthViewModelFactory(requireActivity().application)
     }
@@ -84,6 +85,7 @@ class ProfileFragment : Fragment() {
         if (loggedInEmail != null) {
             val storedData = userAccountsPrefs.getString(loggedInEmail, "User|")
             val name = storedData?.split("|")?.get(0) ?: "User"
+
             binding.tvUserName.text = name
             binding.tvUserEmail.text = loggedInEmail
         }
@@ -98,29 +100,128 @@ class ProfileFragment : Fragment() {
     }
 
     private fun checkPermissionAndExport() {
-        // ... (This function remains unchanged)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            exportTransactionsToCSV()
+            return
+        }
+
+        when {
+            ContextCompat.checkSelfPermission(
+                requireContext(), Manifest.permission.WRITE_EXTERNAL_STORAGE
+            ) == PackageManager.PERMISSION_GRANTED -> {
+                exportTransactionsToCSV()
+            }
+            shouldShowRequestPermissionRationale(Manifest.permission.WRITE_EXTERNAL_STORAGE) -> {
+                AlertDialog.Builder(requireContext())
+                    .setTitle("Storage Permission Needed")
+                    .setMessage("This app needs permission to save the CSV file.")
+                    .setPositiveButton("OK") { _, _ ->
+                        requestPermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                    }
+                    .create()
+                    .show()
+            }
+            else -> {
+                requestPermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            }
+        }
     }
 
     private fun exportTransactionsToCSV() {
-        // ... (This function remains unchanged)
+        val transactions = transactionViewModel.allTransactions.value ?: emptyList()
+
+        if (transactions.isEmpty()) {
+            Toast.makeText(requireContext(), "No transactions to export.", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val csvHeader = "ID,Title,Amount,Type,Category,Date,Note\n"
+        val stringBuilder = StringBuilder().append(csvHeader)
+
+        transactions.forEach { t ->
+            val title = if (t.title.contains(",")) "\"${t.title}\"" else t.title
+            val note = if (t.note.contains(",")) "\"${t.note}\"" else t.note
+            stringBuilder.append("${t.id},$title,${t.amount},${t.type},${t.category},${t.date},$note\n")
+        }
+
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                saveFileUsingMediaStore(stringBuilder.toString())
+            } else {
+                saveFileUsingLegacyStorage(stringBuilder.toString())
+            }
+        } catch (e: Exception) {
+            Toast.makeText(requireContext(), "Export failed: ${e.message}", Toast.LENGTH_LONG).show()
+            e.printStackTrace()
+        }
     }
 
     @androidx.annotation.RequiresApi(Build.VERSION_CODES.Q)
     private fun saveFileUsingMediaStore(csvData: String) {
-        // ... (This function remains unchanged)
+        val contentValues = ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, "SpendSense_Export_${System.currentTimeMillis()}.csv")
+            put(MediaStore.MediaColumns.MIME_TYPE, "text/csv")
+            put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+        }
+        val resolver = requireContext().contentResolver
+        val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+        uri?.let {
+            resolver.openOutputStream(it).use { outputStream ->
+                outputStream?.write(csvData.toByteArray())
+            }
+            Toast.makeText(requireContext(), "Export successful! Saved to Downloads.", Toast.LENGTH_LONG).show()
+        } ?: throw Exception("MediaStore failed to create file.")
     }
 
     @Suppress("DEPRECATION")
     private fun saveFileUsingLegacyStorage(csvData: String) {
-        // ... (This function remains unchanged)
+        val file = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "SpendSense_Export_${System.currentTimeMillis()}.csv")
+        FileWriter(file).use { it.write(csvData) }
+        Toast.makeText(requireContext(), "Export successful! Saved to Downloads.", Toast.LENGTH_LONG).show()
     }
 
     private fun showEditProfileDialog() {
-        // ... (This function remains unchanged)
+        val userAccountsPrefs = requireActivity().getSharedPreferences("UserAccounts", Context.MODE_PRIVATE)
+        val loggedInEmail = UserSessionManager.getLoggedInEmail(requireContext()) ?: return
+        val storedData = userAccountsPrefs.getString(loggedInEmail, "") ?: ""
+        val currentName = storedData.split("|").getOrNull(0) ?: ""
+
+        val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_edit_profile, null)
+        val etName = dialogView.findViewById<EditText>(R.id.etName)
+        val etEmail = dialogView.findViewById<EditText>(R.id.etEmail)
+
+        etName.setText(currentName)
+        etEmail.setText(loggedInEmail)
+        etEmail.isEnabled = false
+
+        AlertDialog.Builder(requireContext())
+            .setTitle("Edit Profile")
+            .setView(dialogView)
+            .setPositiveButton("Save") { _, _ ->
+                val newName = etName.text.toString().trim()
+                if (newName.isNotEmpty()) {
+                    val password = storedData.split("|").getOrNull(1) ?: ""
+                    userAccountsPrefs.edit().putString(loggedInEmail, "$newName|$password").apply()
+                    loadUserInfo()
+                    Toast.makeText(requireContext(), "Profile updated!", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(requireContext(), "Name cannot be empty.", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun showCurrencyDialog() {
-        // ... (This function remains unchanged)
+        val currencies = arrayOf("₹ Indian Rupee (INR)", "$ US Dollar (USD)", "€ Euro (EUR)")
+        AlertDialog.Builder(requireContext())
+            .setTitle("Select Currency")
+            .setItems(currencies) { _, which ->
+                binding.tvCurrency.text = currencies[which]
+                Toast.makeText(requireContext(), "Currency setting coming soon!", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun showClearDataDialog() {
@@ -147,9 +248,7 @@ class ProfileFragment : Fragment() {
             .show()
     }
 
-    // --- THIS IS THE CORRECTED FUNCTION ---
     private fun performLogout() {
-        // AppDatabase.closeDatabase() // This line is removed.
         UserSessionManager.clearSession(requireContext())
         Toast.makeText(requireContext(), "Logged out successfully!", Toast.LENGTH_SHORT).show()
         val intent = Intent(requireContext(), LoginActivity::class.java)
