@@ -19,11 +19,13 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.Observer
 import com.example.spendsense.LoginActivity
 import com.example.spendsense.R
 import com.example.spendsense.SpendSenseApplication
 import com.example.spendsense.UserSessionManager
 import com.example.spendsense.databinding.FragmentProfileBinding
+import com.example.spendsense.models.Transaction
 import com.example.spendsense.viewmodels.AuthViewModel
 import com.example.spendsense.viewmodels.AuthViewModelFactory
 import com.example.spendsense.viewmodels.BudgetViewModel
@@ -40,16 +42,16 @@ class ProfileFragment : Fragment() {
     private var _binding: FragmentProfileBinding? = null
     private val binding get() = _binding!!
 
+    // ViewModels
     private val transactionViewModel: TransactionViewModel by viewModels {
         TransactionViewModelFactory(requireActivity().application)
     }
     private val budgetViewModel: BudgetViewModel by viewModels {
         BudgetViewModelFactory(requireActivity().application)
     }
-    // AuthViewModel not strictly needed here but fine to keep
-    private val authViewModel: AuthViewModel by viewModels {
-        AuthViewModelFactory(requireActivity().application)
-    }
+
+    // Local list to hold transactions for export
+    private var allTransactions: List<Transaction> = emptyList()
 
     private val requestPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
@@ -71,11 +73,22 @@ class ProfileFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         loadUserInfo()
         setupClickListeners()
+
+        // NEW: Start observing transactions so we have data ready for export
+        observeTransactions()
     }
 
     override fun onResume() {
         super.onResume()
         loadUserInfo()
+    }
+
+    // NEW FUNCTION: Observe the ViewModel
+    private fun observeTransactions() {
+        transactionViewModel.allTransactions.observe(viewLifecycleOwner, Observer { transactions ->
+            // Whenever the database updates, update our local list
+            allTransactions = transactions ?: emptyList()
+        })
     }
 
     private fun loadUserInfo() {
@@ -85,7 +98,6 @@ class ProfileFragment : Fragment() {
         if (loggedInEmail != null) {
             val storedData = userAccountsPrefs.getString(loggedInEmail, "User|")
             val name = storedData?.split("|")?.get(0) ?: "User"
-
             binding.tvUserName.text = name
             binding.tvUserEmail.text = loggedInEmail
         }
@@ -128,9 +140,8 @@ class ProfileFragment : Fragment() {
     }
 
     private fun exportTransactionsToCSV() {
-        val transactions = transactionViewModel.allTransactions.value ?: emptyList()
-
-        if (transactions.isEmpty()) {
+        // Use the local list we've been observing
+        if (allTransactions.isEmpty()) {
             Toast.makeText(requireContext(), "No transactions to export.", Toast.LENGTH_SHORT).show()
             return
         }
@@ -138,10 +149,10 @@ class ProfileFragment : Fragment() {
         val csvHeader = "ID,Title,Amount,Type,Category,Date,Note\n"
         val stringBuilder = StringBuilder().append(csvHeader)
 
-        transactions.forEach { t ->
-            val title = if (t.title.contains(",")) "\"${t.title}\"" else t.title
-            val note = if (t.note.contains(",")) "\"${t.note}\"" else t.note
-            stringBuilder.append("${t.id},$title,${t.amount},${t.type},${t.category},${t.date},$note\n")
+        allTransactions.forEach { transaction ->
+            val title = if (transaction.title.contains(",")) "\"${transaction.title}\"" else transaction.title
+            val note = if (transaction.note.contains(",")) "\"${transaction.note}\"" else transaction.note
+            stringBuilder.append("${transaction.id},$title,${transaction.amount},${transaction.type},${transaction.category},${transaction.date},$note\n")
         }
 
         try {
@@ -217,7 +228,7 @@ class ProfileFragment : Fragment() {
         AlertDialog.Builder(requireContext())
             .setTitle("Select Currency")
             .setItems(currencies) { _, which ->
-                binding.tvCurrency.text = currencies[which]
+                // Note: Actual currency switching logic would need to update all views
                 Toast.makeText(requireContext(), "Currency setting coming soon!", Toast.LENGTH_SHORT).show()
             }
             .setNegativeButton("Cancel", null)
