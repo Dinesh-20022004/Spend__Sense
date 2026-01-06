@@ -5,6 +5,7 @@ import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
+import com.example.spendsense.CurrencyHelper
 import com.example.spendsense.R
 import com.example.spendsense.databinding.ItemBudgetBinding
 import com.example.spendsense.models.Budget
@@ -17,13 +18,16 @@ class BudgetAdapter(
     inner class BudgetViewHolder(private val binding: ItemBudgetBinding) : RecyclerView.ViewHolder(binding.root) {
 
         fun bind(budget: Budget) {
+            // Get the dynamic currency symbol
+            val currency = CurrencyHelper.getCurrencySymbol(binding.root.context)
+
             binding.tvCategory.text = budget.category
-            binding.tvSpent.text = "₹${String.format("%.0f", budget.spent)}"
-            binding.tvBudget.text = "₹${String.format("%.0f", budget.amount)}"
+
+            // Use the currency symbol
+            binding.tvSpent.text = "$currency${String.format("%.0f", budget.spent)}"
+            binding.tvBudget.text = "$currency${String.format("%.0f", budget.amount)}"
 
             val percentage = budget.getPercentage()
-
-            // This line will now work correctly
             binding.tvPercentage.text = "${String.format("%.0f", percentage)}%"
 
             val progress = percentage.toInt().coerceIn(0, 100)
@@ -41,10 +45,12 @@ class BudgetAdapter(
 
             if (budget.isOverBudget()) {
                 val over = budget.spent - budget.amount
-                binding.tvStatus.text = "⚠️ Over budget by ₹${String.format("%.0f", over)}"
+                // Use currency symbol in status message
+                binding.tvStatus.text = "⚠️ Over budget by $currency${String.format("%.0f", over)}"
                 binding.tvStatus.setTextColor(colorInt)
             } else {
-                binding.tvStatus.text = "₹${String.format("%.0f", budget.getRemaining())} remaining"
+                // Use currency symbol in status message
+                binding.tvStatus.text = "$currency${String.format("%.0f", budget.getRemaining())} remaining"
                 binding.tvStatus.setTextColor(ContextCompat.getColor(binding.root.context, R.color.gray))
             }
 

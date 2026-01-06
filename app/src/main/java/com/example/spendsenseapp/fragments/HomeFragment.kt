@@ -31,15 +31,12 @@ class HomeFragment : Fragment() {
     private var _binding: FragmentHomeBinding? = null
     private val binding get() = _binding!!
 
-    // Get the shared ViewModel instance using the factory.
-    // NEW AND CORRECT
     private val transactionViewModel: TransactionViewModel by viewModels {
         TransactionViewModelFactory(requireActivity().application)
     }
 
     private lateinit var transactionAdapter: TransactionAdapter
 
-    // The ActivityResultLauncher for handling the notification permission result.
     private val requestPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
             if (isGranted) {
@@ -50,9 +47,7 @@ class HomeFragment : Fragment() {
         }
 
     override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?
+        inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
         _binding = FragmentHomeBinding.inflate(inflater, container, false)
         return binding.root
@@ -64,13 +59,25 @@ class HomeFragment : Fragment() {
         setupUI()
         setupRecyclerView()
         setupClickListeners()
-        observeViewModel() // The new entry point for data.
+        observeViewModel()
     }
 
-    // onResume() is no longer needed to refresh data. LiveData handles this automatically.
+    override fun onResume() {
+        super.onResume()
+        // We need to re-setup UI on resume to catch any currency changes made in ProfileFragment
+        // without needing to restart the app
+        setupUI()
+
+        // Also force an update of the balances with the new currency symbol
+        val currentTransactions = transactionViewModel.allTransactions.value
+        if (currentTransactions != null) {
+            updateBalances(currentTransactions)
+            // Notify adapter to refresh its items with new currency
+            transactionAdapter.notifyDataSetChanged()
+        }
+    }
 
     private fun setupUI() {
-        // This part still uses SharedPreferences for the user's name, which is fine for profile data.
         val userAccountsPrefs = requireActivity().getSharedPreferences("UserAccounts", Context.MODE_PRIVATE)
         val loggedInEmail = UserSessionManager.getLoggedInEmail(requireContext())
 
@@ -102,31 +109,31 @@ class HomeFragment : Fragment() {
     }
 
     private fun observeViewModel() {
-        // This is the core of the reactive architecture.
-        // This block will execute automatically whenever the data in the 'transactions' table changes.
         transactionViewModel.allTransactions.observe(viewLifecycleOwner, Observer { transactions ->
             transactions?.let {
-                // Update the balance cards with the full list of transactions.
                 updateBalances(it)
-                // Update the RecyclerView with only the 5 most recent transactions.
                 transactionAdapter.updateTransactions(it.take(5))
             }
         })
     }
 
     private fun updateBalances(transactions: List<Transaction>) {
+        // Get the dynamic currency symbol
+        val currency = CurrencyHelper.getCurrencySymbol(requireContext())
+
         if (transactions.isEmpty()) {
-            binding.tvTotalBalance.text = "₹0.00"
-            binding.tvIncome.text = "₹0.00"
-            binding.tvExpense.text = "₹0.00"
+            binding.tvTotalBalance.text = "${currency}0.00"
+            binding.tvIncome.text = "${currency}0.00"
+            binding.tvExpense.text = "${currency}0.00"
         } else {
             val totalIncome = transactions.filter { it.type == "income" }.sumOf { it.amount }
             val totalExpense = transactions.filter { it.type == "expense" }.sumOf { it.amount }
             val balance = totalIncome - totalExpense
 
-            binding.tvTotalBalance.text = "₹${String.format("%.2f", balance)}"
-            binding.tvIncome.text = "₹${String.format("%.2f", totalIncome)}"
-            binding.tvExpense.text = "₹${String.format("%.2f", totalExpense)}"
+            // Use the variable 'currency' instead of hardcoded symbol
+            binding.tvTotalBalance.text = "$currency${String.format("%.2f", balance)}"
+            binding.tvIncome.text = "$currency${String.format("%.2f", totalIncome)}"
+            binding.tvExpense.text = "$currency${String.format("%.2f", totalExpense)}"
         }
     }
 
@@ -171,7 +178,7 @@ class HomeFragment : Fragment() {
     private fun openEditTransaction(transaction: Transaction) {
         val intent = Intent(requireContext(), AddTransactionActivity::class.java).apply {
             putExtra("edit_mode", true)
-            putExtra("editing_transaction", transaction) // Pass the whole serializable object
+            putExtra("editing_transaction", transaction)
         }
         startActivity(intent)
         requireActivity().overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)

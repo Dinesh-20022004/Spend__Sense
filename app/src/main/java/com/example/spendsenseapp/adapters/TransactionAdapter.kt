@@ -4,6 +4,7 @@ import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
+import com.example.spendsense.CurrencyHelper
 import com.example.spendsense.R
 import com.example.spendsense.databinding.ItemTransactionBinding
 import com.example.spendsense.models.Transaction
@@ -25,10 +26,13 @@ class TransactionAdapter(
             binding.tvCategory.text = transaction.category
             binding.tvDate.text = formatDate(transaction.date)
 
+            // Get the dynamic currency symbol
+            val currency = CurrencyHelper.getCurrencySymbol(binding.root.context)
+
             val amountText = if (transaction.type == "income") {
-                "+₹${String.format("%.2f", transaction.amount)}"
+                "+$currency${String.format("%.2f", transaction.amount)}"
             } else {
-                "-₹${String.format("%.2f", transaction.amount)}"
+                "-$currency${String.format("%.2f", transaction.amount)}"
             }
             binding.tvAmount.text = amountText
 
@@ -95,20 +99,5 @@ class TransactionAdapter(
     fun updateTransactions(newTransactions: List<Transaction>) {
         transactions = newTransactions
         notifyDataSetChanged()
-    }
-    // In TransactionAdapter.kt
-
-    fun addTransaction(transaction: Transaction) {
-        val newTransactions = mutableListOf(transaction)
-        newTransactions.addAll(transactions)
-        transactions = newTransactions
-        notifyItemInserted(0)
-    }
-
-    fun removeTransaction(position: Int) {
-        val mutableTransactions = transactions.toMutableList()
-        mutableTransactions.removeAt(position)
-        transactions = mutableTransactions
-        notifyItemRemoved(position)
     }
 }
