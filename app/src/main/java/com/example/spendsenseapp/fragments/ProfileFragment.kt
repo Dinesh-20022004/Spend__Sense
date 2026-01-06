@@ -19,6 +19,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.Observer
 import com.example.spendsense.CurrencyHelper
 import com.example.spendsense.LoginActivity
 import com.example.spendsense.R
@@ -26,6 +27,7 @@ import com.example.spendsense.SpendSenseApplication
 import com.example.spendsense.UserSessionManager
 import com.example.spendsense.databinding.FragmentProfileBinding
 import com.example.spendsense.db.AppDatabase
+import com.example.spendsense.models.Transaction
 import com.example.spendsense.viewmodels.AuthViewModel
 import com.example.spendsense.viewmodels.AuthViewModelFactory
 import com.example.spendsense.viewmodels.BudgetViewModel
@@ -52,6 +54,9 @@ class ProfileFragment : Fragment() {
         AuthViewModelFactory(requireActivity().application)
     }
 
+    // Local variable to hold the latest transaction list
+    private var currentTransactions: List<Transaction> = emptyList()
+
     private val requestPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
             if (isGranted) {
@@ -72,6 +77,12 @@ class ProfileFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         loadUserInfo()
         setupClickListeners()
+
+        // --- FIX: Start observing transactions immediately ---
+        transactionViewModel.allTransactions.observe(viewLifecycleOwner, Observer { transactions ->
+            // Keep our local list updated whenever the database changes
+            currentTransactions = transactions ?: emptyList()
+        })
     }
 
     override fun onResume() {
@@ -79,20 +90,16 @@ class ProfileFragment : Fragment() {
         loadUserInfo()
     }
 
+    // ... (loadUserInfo and setupClickListeners remain the same) ...
     private fun loadUserInfo() {
-        // Load User Info
-        val userAccountsPrefs = requireActivity().getSharedPreferences("UserAccounts", Context.MODE_PRIVATE)
         val loggedInEmail = UserSessionManager.getLoggedInEmail(requireContext())
+        val userName = UserSessionManager.getUserName(requireContext()) ?: "User"
 
         if (loggedInEmail != null) {
-            val storedData = userAccountsPrefs.getString(loggedInEmail, "User|")
-            val name = storedData?.split("|")?.get(0) ?: "User"
-
-            binding.tvUserName.text = name
+            binding.tvUserName.text = userName
             binding.tvUserEmail.text = loggedInEmail
         }
 
-        // Load Saved Currency
         val currentSymbol = CurrencyHelper.getCurrencySymbol(requireContext())
         val fullText = when(currentSymbol) {
             "$" -> "$ US Dollar"
@@ -141,9 +148,8 @@ class ProfileFragment : Fragment() {
     }
 
     private fun exportTransactionsToCSV() {
-        val transactions = transactionViewModel.allTransactions.value ?: emptyList()
-
-        if (transactions.isEmpty()) {
+        // Use the local 'currentTransactions' list which is kept up-to-date by the observer
+        if (currentTransactions.isEmpty()) {
             Toast.makeText(requireContext(), "No transactions to export.", Toast.LENGTH_SHORT).show()
             return
         }
@@ -151,7 +157,8 @@ class ProfileFragment : Fragment() {
         val csvHeader = "ID,Title,Amount,Type,Category,Date,Note\n"
         val stringBuilder = StringBuilder().append(csvHeader)
 
-        transactions.forEach { t ->
+        // Iterate over currentTransactions
+        currentTransactions.forEach { t ->
             val title = if (t.title.contains(",")) "\"${t.title}\"" else t.title
             val note = if (t.note.contains(",")) "\"${t.note}\"" else t.note
             stringBuilder.append("${t.id},$title,${t.amount},${t.type},${t.category},${t.date},$note\n")
@@ -168,6 +175,8 @@ class ProfileFragment : Fragment() {
             e.printStackTrace()
         }
     }
+
+    // ... (rest of the file remains exactly the same) ...
 
     @androidx.annotation.RequiresApi(Build.VERSION_CODES.Q)
     private fun saveFileUsingMediaStore(csvData: String) {
@@ -197,7 +206,7 @@ class ProfileFragment : Fragment() {
         val userAccountsPrefs = requireActivity().getSharedPreferences("UserAccounts", Context.MODE_PRIVATE)
         val loggedInEmail = UserSessionManager.getLoggedInEmail(requireContext()) ?: return
         val storedData = userAccountsPrefs.getString(loggedInEmail, "") ?: ""
-        val currentName = storedData.split("|").getOrNull(0) ?: ""
+        val currentName = UserSessionManager.getUserName(requireContext()) ?: ""
 
         val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_edit_profile, null)
         val etName = dialogView.findViewById<EditText>(R.id.etName)
@@ -215,6 +224,7 @@ class ProfileFragment : Fragment() {
                 if (newName.isNotEmpty()) {
                     val password = storedData.split("|").getOrNull(1) ?: ""
                     userAccountsPrefs.edit().putString(loggedInEmail, "$newName|$password").apply()
+                    UserSessionManager.saveUserName(requireContext(), newName)
                     loadUserInfo()
                     Toast.makeText(requireContext(), "Profile updated!", Toast.LENGTH_SHORT).show()
                 } else {
@@ -225,23 +235,15 @@ class ProfileFragment : Fragment() {
             .show()
     }
 
-    // UPDATED CURRENCY DIALOG
     private fun showCurrencyDialog() {
         val currencies = arrayOf("₹ Indian Rupee", "$ US Dollar", "€ Euro", "£ British Pound", "¥ Yen")
-
         AlertDialog.Builder(requireContext())
             .setTitle("Select Currency")
             .setItems(currencies) { _, which ->
-                // Extract just the symbol (the first character)
                 val selectedString = currencies[which]
-                val symbol = selectedString.split(" ")[0] // Gets "₹", "$", etc.
-
-                // Save it using our helper
+                val symbol = selectedString.split(" ")[0]
                 CurrencyHelper.setCurrencySymbol(requireContext(), symbol)
-
-                // Update the text view immediately
                 binding.tvCurrency.text = selectedString
-
                 Toast.makeText(requireContext(), "Currency updated to $symbol", Toast.LENGTH_SHORT).show()
             }
             .setNegativeButton("Cancel", null)
@@ -273,7 +275,7 @@ class ProfileFragment : Fragment() {
     }
 
     private fun performLogout() {
-        // AppDatabase.closeDatabase() // Keep this removed for stability
+        AppDatabase.closeDatabase()
         UserSessionManager.clearSession(requireContext())
         Toast.makeText(requireContext(), "Logged out successfully!", Toast.LENGTH_SHORT).show()
         val intent = Intent(requireContext(), LoginActivity::class.java)

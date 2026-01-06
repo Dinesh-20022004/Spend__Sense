@@ -33,12 +33,8 @@ class SignupActivity : AppCompatActivity() {
         authViewModel.registrationStatus.observe(this, Observer { result ->
             when (result) {
                 is RegistrationResult.Success -> {
-                    Toast.makeText(this, "Account created successfully!", Toast.LENGTH_SHORT).show()
-                    // After successful registration, we still need to log the user in.
-                    // For simplicity, we'll just go to the Login screen. A better UX would be to auto-login.
-                    val intent = Intent(this, LoginActivity::class.java)
-                    intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
-                    startActivity(intent)
+                    Toast.makeText(this, "Account created! Please login.", Toast.LENGTH_SHORT).show()
+                    // Go back to Login screen
                     finish()
                 }
                 is RegistrationResult.EmailAlreadyExists -> {
@@ -59,8 +55,6 @@ class SignupActivity : AppCompatActivity() {
             val confirmPassword = binding.etConfirmPassword.text.toString().trim()
 
             if (validateInput(name, email, password, confirmPassword)) {
-                // In a real app, you would HASH the password here before saving.
-                // For this project, we are storing it as plain text.
                 val user = User(name = name, email = email, passwordHash = password)
                 authViewModel.registerUser(user)
             }
@@ -68,7 +62,10 @@ class SignupActivity : AppCompatActivity() {
     }
 
     private fun validateInput(name: String, email: String, password: String, confirm: String): Boolean {
-        // ... (validation logic is the same)
+        if (name.isEmpty()) { binding.tilName.error = "Name required"; return false }
+        if (email.isEmpty()) { binding.tilEmail.error = "Email required"; return false }
+        if (password.length < 6) { binding.tilPassword.error = "Min 6 chars"; return false }
+        if (password != confirm) { binding.tilConfirmPassword.error = "Passwords match"; return false }
         return true
     }
 }

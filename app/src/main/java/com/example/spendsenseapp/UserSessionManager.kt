@@ -7,16 +7,14 @@ object UserSessionManager {
 
     private const val PREFS_NAME = "SpendSense_App"
     private const val KEY_LAST_LOGGED_IN_EMAIL = "last_logged_in_email"
+    private const val KEY_USER_NAME = "current_user_name" // <-- NEW KEY
 
-    // This gets the main app preferences (to store the last logged-in user)
     private fun getAppPreferences(context: Context): SharedPreferences {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     }
 
-    // This gets the preferences file SPECIFIC to the currently logged-in user
     fun getUserPreferences(context: Context): SharedPreferences? {
         val email = getLoggedInEmail(context) ?: return null
-        // Create a unique file name for each user, e.g., "UserData_test@example.com"
         val userPrefsName = "UserData_${email}"
         return context.getSharedPreferences(userPrefsName, Context.MODE_PRIVATE)
     }
@@ -29,7 +27,17 @@ object UserSessionManager {
         return getAppPreferences(context).getString(KEY_LAST_LOGGED_IN_EMAIL, null)
     }
 
+    // --- NEW FUNCTIONS FOR NAME ---
+    fun saveUserName(context: Context, name: String) {
+        getAppPreferences(context).edit().putString(KEY_USER_NAME, name).apply()
+    }
+
+    fun getUserName(context: Context): String? {
+        return getAppPreferences(context).getString(KEY_USER_NAME, "User")
+    }
+    // -----------------------------
+
     fun clearSession(context: Context) {
-        getAppPreferences(context).edit().remove(KEY_LAST_LOGGED_IN_EMAIL).apply()
+        getAppPreferences(context).edit().clear().apply()
     }
 }

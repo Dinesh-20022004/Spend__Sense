@@ -2,13 +2,13 @@ package com.example.spendsense.viewmodels
 
 import android.app.Application
 import androidx.lifecycle.*
-import com.example.spendsense.SpendSenseApplication
+import com.example.spendsense.db.AppDatabase
 import com.example.spendsense.db.UserRepository
 import com.example.spendsense.models.User
 import kotlinx.coroutines.launch
 
-// The ViewModel class itself is correct and does not need to change.
 class AuthViewModel(private val repository: UserRepository) : ViewModel() {
+
     private val _registrationStatus = MutableLiveData<RegistrationResult>()
     val registrationStatus: LiveData<RegistrationResult> = _registrationStatus
 
@@ -45,12 +45,14 @@ sealed class LoginResult {
     object InvalidCredentials : LoginResult()
 }
 
-// --- THIS IS THE CORRECTED FACTORY ---
+// FACTORY
 class AuthViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(AuthViewModel::class.java)) {
-            // Get the DAO from the database, then create the repository inside the factory.
-            val dao = (application as SpendSenseApplication).database.userDao()
+            // Use a specific "global" database for storing user accounts.
+            // This ensures all login data is central, even if transaction data is split later.
+            val database = AppDatabase.getDatabase(application, "secure_user_store")
+            val dao = database.userDao()
             val repository = UserRepository(dao)
 
             @Suppress("UNCHECKED_CAST")

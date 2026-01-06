@@ -15,6 +15,7 @@ class LoginActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityLoginBinding
 
+    // Use the AuthViewModel to check credentials against the Database
     private val authViewModel: AuthViewModel by viewModels {
         AuthViewModelFactory(application)
     }
@@ -32,9 +33,15 @@ class LoginActivity : AppCompatActivity() {
         authViewModel.loginStatus.observe(this, Observer { result ->
             when (result) {
                 is LoginResult.Success -> {
-                    // Login successful! Save the user's email to the session.
+                    // 1. Save the email so we know WHO is logged in (for database isolation)
                     UserSessionManager.setLoggedInEmail(this, result.user.email)
 
+                    // 2. Save the NAME so we can display it on Home/Profile screens (THE FIX)
+                    UserSessionManager.saveUserName(this, result.user.name)
+
+                    Toast.makeText(this, "Welcome back, ${result.user.name}!", Toast.LENGTH_SHORT).show()
+
+                    // 3. Navigate to Home
                     val intent = Intent(this, MainActivity::class.java)
                     intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                     startActivity(intent)
@@ -50,6 +57,7 @@ class LoginActivity : AppCompatActivity() {
     private fun setupClickListeners() {
         binding.tvSignup.setOnClickListener {
             startActivity(Intent(this, SignupActivity::class.java))
+            overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
         }
 
         binding.btnLogin.setOnClickListener {
@@ -57,13 +65,21 @@ class LoginActivity : AppCompatActivity() {
             val password = binding.etPassword.text.toString().trim()
 
             if (validateInput(email, password)) {
+                // Ask ViewModel to check DB
                 authViewModel.loginUser(email, password)
             }
         }
     }
 
     private fun validateInput(email: String, password: String): Boolean {
-        // ... (validation logic is the same)
+        if (email.isEmpty()) {
+            binding.tilEmail.error = "Email is required"
+            return false
+        }
+        if (password.isEmpty()) {
+            binding.tilPassword.error = "Password is required"
+            return false
+        }
         return true
     }
 }

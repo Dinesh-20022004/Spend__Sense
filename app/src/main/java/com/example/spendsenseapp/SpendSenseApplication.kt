@@ -1,14 +1,15 @@
 package com.example.spendsense
 
 import android.app.Application
-import com.example.spendsense.db.AppDatabase
 
 class SpendSenseApplication : Application() {
-    // The Application class ONLY provides the database instance.
-    val database by lazy { AppDatabase.getDatabase(this) }
+
+    // WE REMOVED THE DATABASE AND REPOSITORY PROPERTIES FROM HERE.
+    // They are now created on-demand in the TransactionViewModelFactory.
 
     override fun onCreate() {
         super.onCreate()
+        // Initialize notifications channel
         NotificationHelper.createNotificationChannel(this)
     }
 }

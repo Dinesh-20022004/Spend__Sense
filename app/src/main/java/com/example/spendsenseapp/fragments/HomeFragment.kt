@@ -31,12 +31,14 @@ class HomeFragment : Fragment() {
     private var _binding: FragmentHomeBinding? = null
     private val binding get() = _binding!!
 
+    // Get the shared ViewModel instance using the factory.
     private val transactionViewModel: TransactionViewModel by viewModels {
         TransactionViewModelFactory(requireActivity().application)
     }
 
     private lateinit var transactionAdapter: TransactionAdapter
 
+    // The ActivityResultLauncher for handling the notification permission result.
     private val requestPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
             if (isGranted) {
@@ -59,30 +61,25 @@ class HomeFragment : Fragment() {
         setupUI()
         setupRecyclerView()
         setupClickListeners()
-        observeViewModel()
+        observeViewModel() // The new entry point for data.
     }
 
     override fun onResume() {
         super.onResume()
-        // We need to re-setup UI on resume to catch any currency changes made in ProfileFragment
-        // without needing to restart the app
+        // Re-setup UI on resume to catch any currency changes made in ProfileFragment
         setupUI()
 
-        // Also force an update of the balances with the new currency symbol
+        // Force an update of the balances with the new currency symbol if data exists
         val currentTransactions = transactionViewModel.allTransactions.value
         if (currentTransactions != null) {
             updateBalances(currentTransactions)
-            // Notify adapter to refresh its items with new currency
             transactionAdapter.notifyDataSetChanged()
         }
     }
 
     private fun setupUI() {
-        val userAccountsPrefs = requireActivity().getSharedPreferences("UserAccounts", Context.MODE_PRIVATE)
-        val loggedInEmail = UserSessionManager.getLoggedInEmail(requireContext())
-
-        val storedData = userAccountsPrefs.getString(loggedInEmail, "User|")
-        val name = storedData?.split("|")?.get(0) ?: "User"
+        // --- FIX: Get user name from Session Manager ---
+        val name = UserSessionManager.getUserName(requireContext()) ?: "User"
         binding.tvUserName.text = name
 
         val calendar = Calendar.getInstance()
@@ -118,7 +115,6 @@ class HomeFragment : Fragment() {
     }
 
     private fun updateBalances(transactions: List<Transaction>) {
-        // Get the dynamic currency symbol
         val currency = CurrencyHelper.getCurrencySymbol(requireContext())
 
         if (transactions.isEmpty()) {
@@ -130,7 +126,6 @@ class HomeFragment : Fragment() {
             val totalExpense = transactions.filter { it.type == "expense" }.sumOf { it.amount }
             val balance = totalIncome - totalExpense
 
-            // Use the variable 'currency' instead of hardcoded symbol
             binding.tvTotalBalance.text = "$currency${String.format("%.2f", balance)}"
             binding.tvIncome.text = "$currency${String.format("%.2f", totalIncome)}"
             binding.tvExpense.text = "$currency${String.format("%.2f", totalExpense)}"
