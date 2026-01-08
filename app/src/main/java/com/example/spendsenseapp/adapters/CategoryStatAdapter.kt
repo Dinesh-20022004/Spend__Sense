@@ -1,8 +1,10 @@
 package com.example.spendsense.adapters
 
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
+import com.example.spendsense.CurrencyHelper
 import com.example.spendsense.databinding.ItemCategoryStatBinding
 import com.example.spendsense.models.CategoryStat
 
@@ -15,12 +17,21 @@ class CategoryStatAdapter(
     ) : RecyclerView.ViewHolder(binding.root) {
 
         fun bind(categoryStat: CategoryStat) {
-            binding.tvCategoryName.text = categoryStat.category
-            binding.tvAmount.text = "₹${String.format("%.0f", categoryStat.amount)}"
-            binding.tvPercentage.text = "${String.format("%.1f", categoryStat.percentage)}%"
-            binding.tvTransactionCount.text = "${categoryStat.count} transaction${if (categoryStat.count != 1) "s" else ""}"
+            // Get the dynamic currency symbol
+            val currency = CurrencyHelper.getCurrencySymbol(binding.root.context)
 
-            binding.progressBar.progress = categoryStat.percentage.toInt()
+            binding.tvCategoryName.text = categoryStat.category
+
+            // Use correct currency
+            binding.tvAmount.text = "$currency${String.format("%.0f", categoryStat.amount)}"
+
+            // HIDE the percentage text view
+            binding.tvPercentage.visibility = View.GONE
+
+            // HIDE the progress bar (The red line)
+            binding.progressBar.visibility = View.GONE
+
+            binding.tvTransactionCount.text = "${categoryStat.count} transaction${if (categoryStat.count != 1) "s" else ""}"
 
             // Set icon based on category
             binding.tvCategoryIcon.text = getCategoryIcon(categoryStat.category)
@@ -35,6 +46,11 @@ class CategoryStatAdapter(
                 "entertainment" -> "🎬"
                 "health" -> "🏥"
                 "education" -> "📚"
+                "salary" -> "💼"
+                "freelance" -> "💻"
+                "business" -> "🏢"
+                "investment" -> "📈"
+                "gift" -> "🎁"
                 else -> "📊"
             }
         }

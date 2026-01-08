@@ -26,20 +26,17 @@ class TransactionsFragment : Fragment() {
     private var _binding: FragmentTransactionsBinding? = null
     private val binding get() = _binding!!
 
-    // Get the shared ViewModel instance using the factory.
-    // NEW AND CORRECT
     private val transactionViewModel: TransactionViewModel by viewModels {
         TransactionViewModelFactory(requireActivity().application)
     }
 
     private lateinit var transactionAdapter: TransactionAdapter
+    private var allTransactions = listOf<Transaction>()
     private var currentFilter = "all"
     private var currentSearchQuery = ""
 
     override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?
+        inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
         _binding = FragmentTransactionsBinding.inflate(inflater, container, false)
         return binding.root
@@ -47,13 +44,22 @@ class TransactionsFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
         setupRecyclerView()
         setupClickListeners()
-        observeViewModel() // The new entry point for data.
+        observeViewModel()
     }
 
-    // onResume and loadTransactions are no longer needed.
+    override fun onResume() {
+        super.onResume()
+        // 1. Force the adapter to refresh its view holders (to pick up the new currency symbol)
+        if (::transactionAdapter.isInitialized) {
+            transactionAdapter.notifyDataSetChanged()
+        }
+
+        // 2. Re-apply the current filter.
+        // This will call updateUI() which recalculates the total at the top using the new currency.
+        applyFilter(currentFilter, allTransactions)
+    }
 
     private fun setupRecyclerView() {
         transactionAdapter = TransactionAdapter(
@@ -68,19 +74,18 @@ class TransactionsFragment : Fragment() {
     }
 
     private fun observeViewModel() {
-        // This block will execute automatically whenever the transaction list in the database changes.
         transactionViewModel.allTransactions.observe(viewLifecycleOwner, Observer { transactions ->
             transactions?.let {
-                // When new data arrives, re-apply the current filters to the full list.
+                allTransactions = it
                 applyFilter(currentFilter, it)
             }
         })
     }
 
     private fun setupClickListeners() {
-        binding.btnAll.setOnClickListener { applyFilter("all", transactionViewModel.allTransactions.value ?: emptyList()) }
-        binding.btnIncome.setOnClickListener { applyFilter("income", transactionViewModel.allTransactions.value ?: emptyList()) }
-        binding.btnExpense.setOnClickListener { applyFilter("expense", transactionViewModel.allTransactions.value ?: emptyList()) }
+        binding.btnAll.setOnClickListener { applyFilter("all", allTransactions) }
+        binding.btnIncome.setOnClickListener { applyFilter("income", allTransactions) }
+        binding.btnExpense.setOnClickListener { applyFilter("expense", allTransactions) }
 
         binding.ivSearch.setOnClickListener {
             if (binding.searchView.visibility == View.VISIBLE) {
@@ -106,24 +111,22 @@ class TransactionsFragment : Fragment() {
 
             override fun onQueryTextChange(newText: String?): Boolean {
                 currentSearchQuery = newText.orEmpty()
-                applyFilter(currentFilter, transactionViewModel.allTransactions.value ?: emptyList())
+                applyFilter(currentFilter, allTransactions)
                 return true
             }
         })
     }
 
-    private fun applyFilter(filter: String, allTransactions: List<Transaction>) {
+    private fun applyFilter(filter: String, transactions: List<Transaction>) {
         currentFilter = filter
         updateFilterButtonStyles(filter)
 
-        // Filter by type first
         val typeFilteredList = when (currentFilter) {
-            "income" -> allTransactions.filter { it.type == "income" }
-            "expense" -> allTransactions.filter { it.type == "expense" }
-            else -> allTransactions
+            "income" -> transactions.filter { it.type == "income" }
+            "expense" -> transactions.filter { it.type == "expense" }
+            else -> transactions
         }
 
-        // Then filter by search query
         val finalList = if (currentSearchQuery.isNotEmpty()) {
             typeFilteredList.filter {
                 it.title.contains(currentSearchQuery, ignoreCase = true)
@@ -154,11 +157,13 @@ class TransactionsFragment : Fragment() {
     private fun updateUI(transactionsToDisplay: List<Transaction>) {
         transactionAdapter.updateTransactions(transactionsToDisplay)
 
+        val currency = CurrencyHelper.getCurrencySymbol(requireContext())
+
         if (transactionsToDisplay.isEmpty()) {
             binding.rvTransactions.visibility = View.GONE
             binding.llEmptyState.visibility = View.VISIBLE
             binding.tvCount.text = "0 transactions"
-            binding.tvTotal.text = "Total: ₹0.00"
+            binding.tvTotal.text = "Total: ${currency}0.00"
         } else {
             binding.rvTransactions.visibility = View.VISIBLE
             binding.llEmptyState.visibility = View.GONE
@@ -174,7 +179,7 @@ class TransactionsFragment : Fragment() {
                     total -= transaction.amount
                 }
             }
-            binding.tvTotal.text = "Total: ₹${String.format("%.2f", total)}"
+            binding.tvTotal.text = "Total: $currency${String.format("%.2f", total)}"
         }
     }
 
@@ -192,7 +197,6 @@ class TransactionsFragment : Fragment() {
             .setTitle("Delete Transaction")
             .setMessage("Are you sure you want to delete '${transaction.title}'?")
             .setPositiveButton("Delete") { _, _ ->
-                // Delegate the delete operation to the ViewModel
                 transactionViewModel.delete(transaction)
                 Toast.makeText(requireContext(), "Transaction deleted", Toast.LENGTH_SHORT).show()
             }

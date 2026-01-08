@@ -1,6 +1,7 @@
 package com.example.spendsense.fragments
 
 import android.app.AlertDialog
+import android.content.Context
 import android.content.res.ColorStateList
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -13,8 +14,10 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Observer
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.example.spendsense.CurrencyHelper
 import com.example.spendsense.R
 import com.example.spendsense.SpendSenseApplication
+import com.example.spendsense.UserSessionManager
 import com.example.spendsense.adapters.BudgetAdapter
 import com.example.spendsense.databinding.DialogAddBudgetBinding
 import com.example.spendsense.databinding.FragmentBudgetBinding
@@ -24,6 +27,8 @@ import com.example.spendsense.viewmodels.BudgetViewModel
 import com.example.spendsense.viewmodels.BudgetViewModelFactory
 import com.example.spendsense.viewmodels.TransactionViewModel
 import com.example.spendsense.viewmodels.TransactionViewModelFactory
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -32,7 +37,6 @@ class BudgetFragment : Fragment() {
     private var _binding: FragmentBudgetBinding? = null
     private val binding get() = _binding!!
 
-    // NEW AND CORRECT
     private val transactionViewModel: TransactionViewModel by viewModels {
         TransactionViewModelFactory(requireActivity().application)
     }
@@ -45,7 +49,9 @@ class BudgetFragment : Fragment() {
 
     private val expenseCategories = listOf("Food", "Transport", "Shopping", "Bills", "Entertainment", "Health", "Education", "Other")
 
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
+    override fun onCreateView(
+        inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
+    ): View {
         _binding = FragmentBudgetBinding.inflate(inflater, container, false)
         return binding.root
     }
@@ -56,6 +62,17 @@ class BudgetFragment : Fragment() {
         setupRecyclerView()
         setupClickListeners()
         observeViewModels()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Force the adapter to refresh its view holders (to pick up the new currency symbol)
+        if (::budgetAdapter.isInitialized) {
+            budgetAdapter.notifyDataSetChanged()
+        }
+
+        // Also re-update the overall budget card with new currency
+        updateUI()
     }
 
     private fun setupRecyclerView() {
@@ -72,7 +89,7 @@ class BudgetFragment : Fragment() {
         val currentMonth = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date())
 
         budgetViewModel.getBudgetsForMonth(currentMonth).observe(viewLifecycleOwner, Observer { budgets ->
-            this.currentBudgets = budgets
+            currentBudgets = budgets
             calculateSpentAmounts(transactionViewModel.allTransactions.value ?: emptyList())
             updateUI()
         })
@@ -118,8 +135,10 @@ class BudgetFragment : Fragment() {
         val totalSpent = currentBudgets.sumOf { it.spent }
         val overallPercentage = if (totalBudget > 0) (totalSpent / totalBudget) * 100 else 0.0
 
-        binding.tvTotalBudget.text = "₹${String.format("%.0f", totalBudget)}"
-        binding.tvTotalSpent.text = "₹${String.format("%.0f", totalSpent)}"
+        val currency = CurrencyHelper.getCurrencySymbol(requireContext())
+
+        binding.tvTotalBudget.text = "$currency${String.format("%.0f", totalBudget)}"
+        binding.tvTotalSpent.text = "$currency${String.format("%.0f", totalSpent)}"
         binding.progressOverall.progress = overallPercentage.toInt().coerceIn(0, 100)
         binding.tvOverallPercentage.text = "${String.format("%.0f", overallPercentage)}%"
 
@@ -135,9 +154,9 @@ class BudgetFragment : Fragment() {
         binding.tvRemaining.setTextColor(colorInt)
 
         if (overallRemaining < 0) {
-            binding.tvRemaining.text = "⚠️ Over budget by ₹${String.format("%.0f", -overallRemaining)}"
+            binding.tvRemaining.text = "⚠️ Over budget by $currency${String.format("%.0f", -overallRemaining)}"
         } else {
-            binding.tvRemaining.text = "₹${String.format("%.0f", overallRemaining)} remaining"
+            binding.tvRemaining.text = "$currency${String.format("%.0f", overallRemaining)} remaining"
         }
 
         if (currentBudgets.isEmpty()) {
@@ -153,6 +172,10 @@ class BudgetFragment : Fragment() {
     private fun showAddBudgetDialog() {
         val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_add_budget, null)
         val bindingDialog = DialogAddBudgetBinding.bind(dialogView)
+
+        // Set prefix to current currency
+        val currency = CurrencyHelper.getCurrencySymbol(requireContext())
+        bindingDialog.tilAmount.prefixText = currency
 
         val existingCategories = currentBudgets.map { it.category }
         val availableCategories = expenseCategories.filter { !existingCategories.contains(it) }
@@ -174,7 +197,7 @@ class BudgetFragment : Fragment() {
 
                 if (category.isNotEmpty() && amount != null && amount > 0) {
                     val newBudget = Budget(
-                        id = 0, // This tells Room to auto-generate the ID for a new entry.
+                        id = 0,
                         category = category,
                         amount = amount,
                         month = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date())
