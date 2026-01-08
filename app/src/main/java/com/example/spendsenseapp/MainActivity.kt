@@ -9,56 +9,72 @@ import com.example.spendsense.fragments.*
 
 class MainActivity : AppCompatActivity() {
 
-    // Using lateinit for the binding, as it will be initialized in onCreate.
     lateinit var binding: ActivityMainBinding
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        // Inflate the layout and set the content view.
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // This check ensures that the initial fragment is loaded only once,
-        // when the activity is first created, and not on configuration changes (like screen rotation).
-        if (savedInstanceState == null) {
-            loadFragment(HomeFragment())
-        }
-
-        // Set up the listeners for the UI components.
         setupBottomNavigation()
         setupFab()
+
+        if (savedInstanceState == null) {
+            loadFragment(HomeFragment())
+            showFab(true) // Ensure FAB is visible on Home by default
+        }
     }
 
     private fun setupBottomNavigation() {
-        // Set a listener that will be called when a bottom navigation item is selected.
         binding.bottomNavigation.setOnItemSelectedListener { item ->
             val fragment: Fragment = when (item.itemId) {
-                R.id.nav_home -> HomeFragment()
-                R.id.nav_transactions -> TransactionsFragment()
-                R.id.nav_reports -> ReportsFragment()
-                R.id.nav_budget -> BudgetFragment()
-                R.id.nav_profile -> ProfileFragment()
-                else -> HomeFragment() // Default to HomeFragment if something goes wrong.
+                R.id.nav_home -> {
+                    showFab(true) // Show
+                    HomeFragment()
+                }
+                R.id.nav_transactions -> {
+                    showFab(true) // Show
+                    TransactionsFragment()
+                }
+                R.id.nav_reports -> {
+                    showFab(false) // Hide
+                    ReportsFragment()
+                }
+                R.id.nav_budget -> {
+                    showFab(false) // Hide
+                    BudgetFragment()
+                }
+                R.id.nav_profile -> {
+                    showFab(false) // Hide
+                    ProfileFragment()
+                }
+                else -> {
+                    showFab(true)
+                    HomeFragment()
+                }
             }
             loadFragment(fragment)
-            true // Return true to display the item as the selected item.
+            true
+        }
+    }
+
+    private fun showFab(show: Boolean) {
+        if (show) {
+            binding.fabAddTransaction.show()
+        } else {
+            binding.fabAddTransaction.hide()
         }
     }
 
     private fun setupFab() {
-        // Set a listener for the Floating Action Button.
         binding.fabAddTransaction.setOnClickListener {
             val intent = Intent(this, AddTransactionActivity::class.java)
             startActivity(intent)
-            // Apply a custom animation for the screen transition.
             overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
         }
     }
 
     private fun loadFragment(fragment: Fragment) {
-        // This is the standard way to replace a fragment in a container.
-        // We use .replace() because only one fragment should be visible at a time with bottom navigation.
         supportFragmentManager.beginTransaction()
             .replace(R.id.fragmentContainer, fragment)
             .commit()
