@@ -1,7 +1,6 @@
 package com.example.spendsense.fragments
 
 import android.app.AlertDialog
-import android.content.Context
 import android.content.res.ColorStateList
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -27,8 +26,6 @@ import com.example.spendsense.viewmodels.BudgetViewModel
 import com.example.spendsense.viewmodels.BudgetViewModelFactory
 import com.example.spendsense.viewmodels.TransactionViewModel
 import com.example.spendsense.viewmodels.TransactionViewModelFactory
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -66,12 +63,9 @@ class BudgetFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        // Force the adapter to refresh its view holders (to pick up the new currency symbol)
         if (::budgetAdapter.isInitialized) {
             budgetAdapter.notifyDataSetChanged()
         }
-
-        // Also re-update the overall budget card with new currency
         updateUI()
     }
 
@@ -173,7 +167,6 @@ class BudgetFragment : Fragment() {
         val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_add_budget, null)
         val bindingDialog = DialogAddBudgetBinding.bind(dialogView)
 
-        // Set prefix to current currency
         val currency = CurrencyHelper.getCurrencySymbol(requireContext())
         bindingDialog.tilAmount.prefixText = currency
 
@@ -196,11 +189,14 @@ class BudgetFragment : Fragment() {
                 val amount = bindingDialog.etAmount.text.toString().toDoubleOrNull()
 
                 if (category.isNotEmpty() && amount != null && amount > 0) {
+                    val currentUserEmail = UserSessionManager.getLoggedInEmail(requireContext()) ?: ""
+
                     val newBudget = Budget(
                         id = 0,
                         category = category,
                         amount = amount,
-                        month = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date())
+                        month = SimpleDateFormat("yyyy-MM", Locale.getDefault()).format(Date()),
+                        userEmail = currentUserEmail // <-- THIS WAS ADDED
                     )
                     budgetViewModel.insert(newBudget)
                     Toast.makeText(requireContext(), "Budget for '$category' added!", Toast.LENGTH_SHORT).show()

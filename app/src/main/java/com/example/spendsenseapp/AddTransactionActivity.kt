@@ -22,8 +22,7 @@ class AddTransactionActivity : AppCompatActivity() {
     private var isEditMode = false
     private var editingTransactionId: Int = 0
 
-    // THIS IS THE CORRECTED INITIALIZATION FOR AN ACTIVITY
-    // NEW AND CORRECT
+    // Get the ViewModel using the factory
     private val transactionViewModel: TransactionViewModel by viewModels {
         TransactionViewModelFactory(application)
     }
@@ -37,18 +36,20 @@ class AddTransactionActivity : AppCompatActivity() {
         setContentView(binding.root)
         overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
 
+        // Check if we are editing an existing transaction
         val editingTransaction = intent.getSerializableExtra("editing_transaction") as? Transaction
         isEditMode = (editingTransaction != null)
 
         if (isEditMode && editingTransaction != null) {
             loadTransactionForEdit(editingTransaction)
         } else {
+            // This is a new transaction
             val typeFromIntent = intent.getStringExtra("type")
             if (typeFromIntent != null) {
                 selectedType = typeFromIntent
             }
             updateTypeButtons()
-            updateDateDisplay()
+            updateDateDisplay() // Set to today's date for new transactions
         }
 
         setupClickListeners()
@@ -119,20 +120,28 @@ class AddTransactionActivity : AppCompatActivity() {
 
     private fun loadTransactionForEdit(transaction: Transaction) {
         binding.tvTitle.text = "Edit Transaction"
+
         editingTransactionId = transaction.id
         selectedType = transaction.type
         updateTypeButtons()
+
         binding.etAmount.setText(transaction.amount.toString())
         binding.etTitle.setText(transaction.title)
         binding.etNote.setText(transaction.note)
 
         try {
             val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).parse(transaction.date)
-            if (date != null) selectedDate.time = date
-        } catch (e: Exception) { e.printStackTrace() }
+            if (date != null) {
+                selectedDate.time = date
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
         updateDateDisplay()
 
-        binding.actvCategory.post { binding.actvCategory.setText(transaction.category, false) }
+        binding.actvCategory.post {
+            binding.actvCategory.setText(transaction.category, false)
+        }
     }
 
     private fun saveTransaction() {
@@ -146,12 +155,22 @@ class AddTransactionActivity : AppCompatActivity() {
         val amount = amountText.toDouble()
         val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
+        // 1. Get current user email
+        val currentUserEmail = UserSessionManager.getLoggedInEmail(this) ?: ""
+
+        // 2. Create the Transaction object including userEmail
         val transactionToSave = Transaction(
             id = if (isEditMode) editingTransactionId else 0,
-            title = title, amount = amount, type = selectedType,
-            category = category, date = dateFormat.format(selectedDate.time), note = note
+            title = title,
+            amount = amount,
+            type = selectedType,
+            category = category,
+            date = dateFormat.format(selectedDate.time),
+            note = note,
+            userEmail = currentUserEmail // <-- THIS IS THE KEY UPDATE
         )
 
+        // Delegate the database operation to the ViewModel
         if (isEditMode) {
             transactionViewModel.update(transactionToSave)
             Toast.makeText(this, "Transaction updated!", Toast.LENGTH_SHORT).show()
@@ -160,7 +179,7 @@ class AddTransactionActivity : AppCompatActivity() {
             Toast.makeText(this, "Transaction saved!", Toast.LENGTH_SHORT).show()
         }
 
-        finish()
+        finish() // Close the activity and return to the previous screen
     }
 
     private fun validateInputs(amount: String, title: String, category: String): Boolean {

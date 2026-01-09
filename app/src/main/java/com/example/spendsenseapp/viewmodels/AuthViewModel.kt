@@ -2,6 +2,7 @@ package com.example.spendsense.viewmodels
 
 import android.app.Application
 import androidx.lifecycle.*
+import com.example.spendsense.SpendSenseApplication
 import com.example.spendsense.db.AppDatabase
 import com.example.spendsense.db.UserRepository
 import com.example.spendsense.models.User
@@ -45,13 +46,15 @@ sealed class LoginResult {
     object InvalidCredentials : LoginResult()
 }
 
-// FACTORY
+// --- THIS IS THE FIXED FACTORY ---
 class AuthViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(AuthViewModel::class.java)) {
-            // Use a specific "global" database for storing user accounts.
-            // This ensures all login data is central, even if transaction data is split later.
-            val database = AppDatabase.getDatabase(application, "secure_user_store")
+
+            // FIX: Call getDatabase with ONLY the application context.
+            // We removed the second argument ("secure_user_store") from AppDatabase.
+            val database = AppDatabase.getDatabase(application)
+
             val dao = database.userDao()
             val repository = UserRepository(dao)
 

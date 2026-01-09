@@ -8,12 +8,10 @@ import com.example.spendsense.models.Budget
 import com.example.spendsense.models.Transaction
 import com.example.spendsense.models.User
 
-// This annotation defines the schema of the database.
-// version = 2 because we have added the User and Budget entities.
-@Database(entities = [Transaction::class, User::class, Budget::class], version = 2, exportSchema = false)
+// VERSION IS NOW 3
+@Database(entities = [Transaction::class, User::class, Budget::class], version = 3, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
 
-    // Abstract functions for each DAO.
     abstract fun transactionDao(): TransactionDao
     abstract fun userDao(): UserDao
     abstract fun budgetDao(): BudgetDao
@@ -22,58 +20,20 @@ abstract class AppDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
-        /**
-         * Returns an instance of the database.
-         * Crucially, it ensures that the database instance returned matches the 'userEmail' requested.
-         * If the currently open database is for a different user (or is the login DB), it closes it
-         * and opens the correct one.
-         */
-        fun getDatabase(context: Context, userEmail: String): AppDatabase {
-            // Sanitize the email to make a valid filename
-            val safeEmail = userEmail.replace("[@.]".toRegex(), "_")
-            val targetDbName = "spendsense_db_$safeEmail"
-
-            val currentInstance = INSTANCE
-
-            // Check if an instance already exists
-            if (currentInstance != null && currentInstance.isOpen) {
-                // CRITICAL CHECK: Is the open database the one we actually want?
-                if (currentInstance.openHelper.databaseName == targetDbName) {
-                    // Yes, it is. Return it.
-                    return currentInstance
-                } else {
-                    // No, it's a different database (e.g., we just switched users).
-                    // Close the old one so we can create the new one.
-                    currentInstance.close()
-                    INSTANCE = null
-                }
-            }
-
-            // Create the new database instance
-            synchronized(this) {
+        fun getDatabase(context: Context): AppDatabase {
+            return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
-                    targetDbName
+                    "spendsense_database"
                 )
-                    // This strategy deletes the old DB if the version changes. Good for development.
+                    // This will delete the old database (v2) and create a new empty one (v3)
+                    // This is necessary because we changed the table structure.
                     .fallbackToDestructiveMigration()
                     .build()
-
                 INSTANCE = instance
-                return instance
+                instance
             }
-        }
-
-        /**
-         * Explicitly closes the database connection.
-         * Should be called during logout.
-         */
-        fun closeDatabase() {
-            if (INSTANCE != null && INSTANCE!!.isOpen) {
-                INSTANCE!!.close()
-            }
-            INSTANCE = null
         }
     }
 }

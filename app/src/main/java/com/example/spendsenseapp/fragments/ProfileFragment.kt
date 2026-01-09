@@ -19,14 +19,12 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
-import androidx.lifecycle.Observer
 import com.example.spendsense.CurrencyHelper
 import com.example.spendsense.LoginActivity
 import com.example.spendsense.R
 import com.example.spendsense.SpendSenseApplication
 import com.example.spendsense.UserSessionManager
 import com.example.spendsense.databinding.FragmentProfileBinding
-import com.example.spendsense.db.AppDatabase
 import com.example.spendsense.models.Transaction
 import com.example.spendsense.viewmodels.AuthViewModel
 import com.example.spendsense.viewmodels.AuthViewModelFactory
@@ -44,6 +42,7 @@ class ProfileFragment : Fragment() {
     private var _binding: FragmentProfileBinding? = null
     private val binding get() = _binding!!
 
+    // ViewModels
     private val transactionViewModel: TransactionViewModel by viewModels {
         TransactionViewModelFactory(requireActivity().application)
     }
@@ -54,7 +53,7 @@ class ProfileFragment : Fragment() {
         AuthViewModelFactory(requireActivity().application)
     }
 
-    // Local variable to hold the latest transaction list
+    // Local list to hold transactions for export
     private var currentTransactions: List<Transaction> = emptyList()
 
     private val requestPermissionLauncher =
@@ -78,11 +77,10 @@ class ProfileFragment : Fragment() {
         loadUserInfo()
         setupClickListeners()
 
-        // --- FIX: Start observing transactions immediately ---
-        transactionViewModel.allTransactions.observe(viewLifecycleOwner, Observer { transactions ->
-            // Keep our local list updated whenever the database changes
+        // Start observing transactions so we have data ready for export
+        transactionViewModel.allTransactions.observe(viewLifecycleOwner) { transactions ->
             currentTransactions = transactions ?: emptyList()
-        })
+        }
     }
 
     override fun onResume() {
@@ -90,7 +88,6 @@ class ProfileFragment : Fragment() {
         loadUserInfo()
     }
 
-    // ... (loadUserInfo and setupClickListeners remain the same) ...
     private fun loadUserInfo() {
         val loggedInEmail = UserSessionManager.getLoggedInEmail(requireContext())
         val userName = UserSessionManager.getUserName(requireContext()) ?: "User"
@@ -100,6 +97,7 @@ class ProfileFragment : Fragment() {
             binding.tvUserEmail.text = loggedInEmail
         }
 
+        // Load Saved Currency
         val currentSymbol = CurrencyHelper.getCurrencySymbol(requireContext())
         val fullText = when(currentSymbol) {
             "$" -> "$ US Dollar"
@@ -148,7 +146,6 @@ class ProfileFragment : Fragment() {
     }
 
     private fun exportTransactionsToCSV() {
-        // Use the local 'currentTransactions' list which is kept up-to-date by the observer
         if (currentTransactions.isEmpty()) {
             Toast.makeText(requireContext(), "No transactions to export.", Toast.LENGTH_SHORT).show()
             return
@@ -157,7 +154,6 @@ class ProfileFragment : Fragment() {
         val csvHeader = "ID,Title,Amount,Type,Category,Date,Note\n"
         val stringBuilder = StringBuilder().append(csvHeader)
 
-        // Iterate over currentTransactions
         currentTransactions.forEach { t ->
             val title = if (t.title.contains(",")) "\"${t.title}\"" else t.title
             val note = if (t.note.contains(",")) "\"${t.note}\"" else t.note
@@ -175,8 +171,6 @@ class ProfileFragment : Fragment() {
             e.printStackTrace()
         }
     }
-
-    // ... (rest of the file remains exactly the same) ...
 
     @androidx.annotation.RequiresApi(Build.VERSION_CODES.Q)
     private fun saveFileUsingMediaStore(csvData: String) {
@@ -275,7 +269,7 @@ class ProfileFragment : Fragment() {
     }
 
     private fun performLogout() {
-        AppDatabase.closeDatabase()
+        // AppDatabase.closeDatabase() // This is removed.
         UserSessionManager.clearSession(requireContext())
         Toast.makeText(requireContext(), "Logged out successfully!", Toast.LENGTH_SHORT).show()
         val intent = Intent(requireContext(), LoginActivity::class.java)

@@ -8,10 +8,13 @@ import com.example.spendsense.db.BudgetRepository
 import com.example.spendsense.models.Budget
 import kotlinx.coroutines.launch
 
-class BudgetViewModel(private val repository: BudgetRepository) : ViewModel() {
+class BudgetViewModel(
+    private val repository: BudgetRepository,
+    private val userEmail: String
+) : ViewModel() {
 
     fun getBudgetsForMonth(month: String): LiveData<List<Budget>> {
-        return repository.getBudgetsForMonth(month).asLiveData()
+        return repository.getBudgetsForMonth(month, userEmail).asLiveData()
     }
 
     fun insert(budget: Budget) = viewModelScope.launch {
@@ -23,28 +26,24 @@ class BudgetViewModel(private val repository: BudgetRepository) : ViewModel() {
     }
 
     fun deleteAll() = viewModelScope.launch {
-        repository.deleteAllBudgets()
+        repository.deleteAllBudgets(userEmail)
     }
 }
 
-// FACTORY
 class BudgetViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(BudgetViewModel::class.java)) {
-            // Get the current user's email to access their specific database
-            val userEmail = UserSessionManager.getLoggedInEmail(application)
+            // 1. Get the database instance
+            val database = AppDatabase.getDatabase(application)
 
-            if (userEmail != null) {
-                // Get the user-specific database
-                val database = AppDatabase.getDatabase(application, userEmail)
-                val dao = database.budgetDao()
-                val repository = BudgetRepository(dao)
+            // 2. Create the repository using the DAO from the database
+            val repository = BudgetRepository(database.budgetDao())
 
-                @Suppress("UNCHECKED_CAST")
-                return BudgetViewModel(repository) as T
-            }
-            // If no user is logged in (shouldn't happen here), handle safely
-            throw IllegalArgumentException("User not logged in, cannot create BudgetViewModel")
+            // 3. Get the current user's email
+            val email = UserSessionManager.getLoggedInEmail(application) ?: ""
+
+            @Suppress("UNCHECKED_CAST")
+            return BudgetViewModel(repository, email) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
